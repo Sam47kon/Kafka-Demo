@@ -17,7 +17,7 @@ import ru.sam47kon.kd.emailnotification.exception.RetryableException;
 
 @Slf4j
 @Component
-@KafkaListener(topics = "#{'${product-created-events-topic}'.split(',')}")
+@KafkaListener(topics = "#{'${product-created-events-topic}'.split(',')}", groupId = "${spring.kafka.consumer.group-id}")
 public class ProductCreateEventHandler {
 
 	private static final String URL = "http://localhost:8090/response/";
@@ -30,7 +30,7 @@ public class ProductCreateEventHandler {
 
 	@KafkaHandler
 	public void handle(@NotNull ProductCreateEvent productCreateEvent) {
-		log.info("productCreateEvent: {}", productCreateEvent.getTittle());
+		log.info("productCreateEvent: productId: {}, tittle: {}", productCreateEvent.getProductId(), productCreateEvent.getTittle());
 
 		try {
 			ResponseEntity<String> response = restTemplate.exchange(URL, HttpMethod.POST, new HttpEntity<>(productCreateEvent), String.class);
