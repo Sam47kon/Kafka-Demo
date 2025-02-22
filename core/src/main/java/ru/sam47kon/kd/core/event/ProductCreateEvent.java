@@ -18,4 +18,8 @@ public class ProductCreateEvent {
 	String tittle;
 	BigDecimal price;
 	Integer quantity;
+
+	public boolean checkPrice() {
+		return BigDecimal.ZERO.compareTo(price) < 0;
+	}
 }

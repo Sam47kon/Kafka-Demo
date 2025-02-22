@@ -15,6 +15,9 @@ import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
+import org.springframework.util.backoff.FixedBackOff;
+import ru.sam47kon.kd.emailnotification.exception.NonRetryableException;
+import ru.sam47kon.kd.emailnotification.exception.RetryableException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -24,6 +27,20 @@ public class KafkaConfig {
 
 	@Autowired
 	Environment environment;
+
+	@Bean
+	ProducerFactory<String, Object> producerFactory() {
+		Map<String, Object> config = new HashMap<>();
+		config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, environment.getProperty("spring.kafka.bootstrap-servers"));
+		config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+		config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
+		return new DefaultKafkaProducerFactory<>(config);
+	}
+
+	@Bean
+	KafkaTemplate<String, Object> kafkaTemplate(ProducerFactory<String, Object> producerFactory) {
+		return new KafkaTemplate<>(producerFactory);
+	}
 
 	@Bean
 	ConsumerFactory<String, Object> consumerFactory() {
@@ -46,23 +63,11 @@ public class KafkaConfig {
 		ConcurrentKafkaListenerContainerFactory<String, Object> factory = new ConcurrentKafkaListenerContainerFactory<>();
 		factory.setConsumerFactory(consumerFactory);
 
-		DefaultErrorHandler errorHandler = new DefaultErrorHandler(new DeadLetterPublishingRecoverer(kafkaTemplate));
+		DefaultErrorHandler errorHandler = new DefaultErrorHandler(new DeadLetterPublishingRecoverer(kafkaTemplate), new FixedBackOff(300, 3));
+		errorHandler.addNotRetryableExceptions(NonRetryableException.class);
+		errorHandler.addRetryableExceptions(RetryableException.class);
 		factory.setCommonErrorHandler(errorHandler);
 
 		return factory;
-	}
-
-	@Bean
-	KafkaTemplate<String, Object> kafkaTemplate(ProducerFactory<String, Object> producerFactory) {
-		return new KafkaTemplate<>(producerFactory);
-	}
-
-	@Bean
-	ProducerFactory<String, Object> producerFactory() {
-		Map<String, Object> config = new HashMap<>();
-		config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, environment.getProperty("spring.kafka.bootstrap-servers"));
-		config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-		config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
-		return new DefaultKafkaProducerFactory<>(config);
 	}
 }
